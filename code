@@ -1,0 +1,319 @@
+#include "derivative.h"
+#include <hidef.h>      
+
+///////////////////////////////////////////////Declaración de variables////////////////////////////////////////////////////////////////
+
+unsigned int car,d,g,a,f,periodo,flanco1,x,frec;     
+unsigned char h,unimil,cente,dece,uni,decmil,cuenta;     
+const unsigned char texto1[]="MX=";  //Texto en línea 1
+    
+
+///////////////////////////////////////////////Declaración de funciones//////////////////////////////////////////////////////////////
+
+void configPuertos (void); //Configuración de los puertos
+void configORIG (void);    //Motor al origen
+void RGB (void);           //Enciende led RGB en función del puerto H
+void retardo (void);       //Retardo de 130 microsegundos
+void inidisplay (void);    //Inicializa LCD
+void mandatexto (void);    //Manda texto al LCD
+void writeLcd4 (unsigned char dato, unsigned char rs); //Escribe sobre el LCD (Rs = 0 comando, Rs = 1 dato)
+void reta5 (void);   //Retardo de 5 milisegundos
+void separa (void);  //separa la variable "cuenta"  
+void calcperiodo (void);   //Calcula periodo
+void comparaperiodo (void);   //Compara periodo 
+void repite (void); //Repite el programa si el usuario lo desea
+void RGBotro (void);
+
+
+
+///////////////////////////////////////////////Programa principal////////////////////////////////////////////////////////////////////
+
+void main (void){
+
+cuenta = 0;
+
+  configPuertos();  
+  
+  configORIG();
+  
+  inidisplay();   
+  mandatexto();
+  RGB();
+ calcperiodo();
+  comparaperiodo();
+  repite();
+  
+   
+ 
+} //FIN DEL MAIN 
+
+///////////////////////////////////////////////Configuración de los puertos////////////////////////////////////////////////////////////////////
+
+void configPuertos(void){
+  
+  DDRB = 0xff;    //Puerto B como salida
+  DDRA = 0x00;    //Puerto A como entrada
+  PUCR = 0x01;    //Habilita resistencias de PULL-UP en las líneas configuradas como entrada en puerto A
+  DDRH = 0x00;    //Puerto H como entrada
+  DDRP = 0xff;    //Puerto P como salida
+  
+} //FIN DEL CONFIGPUERTOS
+
+///////////////////////////////////////////////Motor al origen////////////////////////////////////////////////////////////////////
+
+void configORIG(void){
+  
+  PORTB = 0x02;   //Habilita motor (PB.3=0) y gira izquierda (PB.1=1)
+  
+  while(PORTA & 0x01){
+    
+    PORTB = 0x03;   //Motor habilitado (PB.3=0),gira izquierda (PB.1=1) y STEPX habilitado (PB.0 =1)
+    
+    retardo();
+    
+    PORTB = 0x02; //Se deshabilita STEPX PB.0=0
+    
+    retardo();
+    
+  }   //FIN DEL WHILE
+  
+decmil = 0x30;
+unimil = 0x30;
+cente = 0x30;
+dece = 0x30;
+uni = 0x30;
+
+  }//FIN DE ConfigORIG
+  
+///////////////////////////////////////////////LED RGB///////////////////////////////////////////////////////////////////////////////////
+
+void RGB (void){
+
+while(PTH==0){
+
+       
+
+if((PTH==0x01)|| (PTH==0x02) || (PTH==0x04) || (PTH==0x08) || (PTH==0x10)){
+    
+    
+    if (PTH==0x01) PTP = 0x10;  //Si es PH.0 led RGB a rojo
+    if (PTH==0x02) PTP = 0x40;  //Si es PH.1 led RGB a verde
+    if (PTH==0x04) PTP = 0x20;  //Si es PH.2 led RGB a azul
+    if (PTH==0x08) PTP = 0x70;  //Si es PH.3 led RGB a blanco
+    if (PTH==0x10) PTP = 0x00;  //Si es PH.4 led RGB a apagado
+   
+    
+} 
+
+else {
+    configORIG();
+}
+    
+  
+ 
+    
+} //FIN DE WHILE
+  
+} //FIN DEL RGB
+  
+
+
+///////////////////////////////////////////////Retardo 130 microsegundos////////////////////////////////////////////////////////////////////
+
+void retardo(void){
+  
+  for(d=0;d<0x1ff;d++); //Retardo 130 microsegundos
+  
+}  //FIN RETARDO
+
+///////////////////////////////////////////////Inicialización del LCD/////////////////////////////////////////////////////////
+
+void inidisplay (void){  
+  
+  DDRK = 0xff;        //Puerto K como salida
+  reta5();            //Retardo de 5ms
+  reta5();            //Retardo de 5ms
+  writeLcd4(0x20,0);  //Bus 4-bit, 1 líneas, 5x7 matrix
+  writeLcd4(0x0C,0);  //Display on , cursor off, desactiva el parpadeo del cursor
+  writeLcd4(0x06,0);  //Cursor auto-incremento, NO desplazar la visualización cada vez que se ve un dato
+  writeLcd4(0x01,0);  //Borra display
+  
+} //FIN INIDISPLAY
+
+///////////////////////////////////////////////Manda texto al LCD///////////////////////////////////////////////////////////////////////////
+
+void mandatexto(void){     //Manda únicamente MX = 0000. No se volverá a repetir en todo el programa
+  
+ car=0;  //Apunta al caracter a visualizar en el LCD
+  inidisplay();
+
+  while(1){
+    
+    if(texto1[car]==0) break; //Fin del texto 1
+    writeLcd4(texto1[car],1); //Manda dato ( MX =)
+    car++;                    //Incrementa puntero
+  }   //FIN WHILE(1)
+
+writeLcd4(decmil,1);          //Manda decenas de millar
+writeLcd4(unimil,1);          //Manda unidades de millar
+writeLcd4(cente,1);           //Manda centenas 
+writeLcd4(dece,1);            //Manda decenas
+writeLcd4(uni,1);             //Manda unidades
+
+
+}  //FIN MANDATEXTO
+
+////////////////////////////////////////////////Retardo 5 milisegundos//////////////////////////////////////////////////////////////////////
+
+void reta5(void){
+
+asm{
+
+;(2+(1+3)*30000)+5=120007/24MHz=5ms
+
+dly1: ldy   #30000      ;(2)
+dly:  dey              ;(1)
+      bne   dly         ;(3/1)
+      rts               ;(5)
+      
+} //FIN ASM
+} //FIN RETA5
+
+/////////////////////////////////////////////// Escribir en el LCD (comando o dato)///////////////////////////////////////////////////////////
+
+void writeLcd4 (unsigned char dato, unsigned char rs)
+
+{
+unsigned char hi, lo;
+
+hi = ((dato & 0xf0) >> 2) | rs ; //Filtra, desplaza y prepara para coman/dato
+lo = ((dato & 0x0f) << 2) | rs ; // función del valor de "rs"
+
+PORTK = hi; // Escribe con EN=0
+PORTK = hi | 0x02; // Escribe con EN=1 (pulso)
+
+asm ("nop");
+asm ("nop");
+
+PORTK = hi; // Escribe con EN=0
+// Fin escritura nibble alto
+
+PORTK = lo; // Escribe con EN=0
+PORTK = lo | 0x02; // Escribe con EN=1 (pulso)
+
+asm ("nop");
+asm ("nop");
+
+PORTK = lo; // Escribe con EN=0
+
+// Transferencia de un byte completa
+reta5(); // Retardo de 5ms
+// Fin escritura nibble bajo
+} //FIN WRITELCD4
+     
+ ////////////////////////////////////////////Separa//////////////////////////////////////////////////////////////////////////////////////////////////
+ 
+ void separa (void){
+  decmil = (cuenta/10000) +0x30; //Obtiene decenas de millar y pasa a ascii (+30)
+  f= cuenta%10000;             //Obtiene resto de e/10000
+  unimil = (f/1000) +0x30;  //Saca unidades de millar y pasa a ascii (+30)
+  g = f%1000;       //Saca resto de f/1000
+  cente = (g/100) +0x30;    //Saca centenas y pasa a ascii (+30)
+  h = g%100;         //Saca resto de g/100
+  dece = (h/10) + 0x30;      //Saca decenas y pasa a ascii (+30)
+  uni = (h%10) +0x30;       //Saca unidades y pasa a ascii (+30) 
+} //FIN SEPARA
+ 
+
+///////////////////////////////////Calcula periodo//////////////////////////////////////////////////////////////////////////////////////////////
+
+void calcperiodo(void){
+ 
+ TSCR1 = 0x90; // Habilita Timer y borrado de flags automático 
+
+ TSCR2 = 0x00; // Deshab. interrup. Timer y prescaler = 1 
+ TCTL4 = 0x01; // IC0 por flanco subida 
+
+ while (!(TFLG1 & 0x01)); // Espera flanco subida 1º
+ flanco1 = TC0; // Lee 1º valor del "TCNT" y borra flag automático 
+ while (!(TFLG1 & 0x01)); // Espera flanco subida 2º 
+ periodo = TC0 - flanco1;
+ frec =  24000/periodo;
+ 
+ } //FIN CALCPERIODO
+ 
+ /////////////////////////////////////////////Compara periodo////////////////////////////////////////////////////////////////////////////////////
+ 
+void comparaperiodo(void){
+
+      while(cuenta!=140)
+                      {
+                      for (x=0; x<100; x++)                // Repetimos la onda 100 veces, es el máximo hacia la derecha .
+                      {
+                      
+                        PORTB=0x01;                    // Activamos la línea PB.0
+                        retardo();                        // LLamada a la función de retardo
+    
+                        PORTB=0x00;                    // Desactivamos la línea PB.0
+                        retardo();
+                        
+                      } //FIN DEL FOR
+                       
+                      cuenta++;    //Incrementa cuenta
+                      separa();    //Separa cuenta en centenas, decenas y unidades
+                      mandatexto(); //Manda el valor de cuenta al LCD
+                    
+                     
+    if ((PTH==0x01)&&(frec>38) && (frec<42)) break;//Si es el rojo y se encuentra entre el rango de valores del rojo, sal del bucle
+        
+      
+    
+    if ((PTH==0x02)&&(frec>12) && (frec<15)) break; //Si es el verde y se encuentra entre el rango de valores del verde, sal del bucle
+    
+    if ((PTH==0x04) && (frec>8) && (frec<11)) break;//Si es el azul y se encuentra entre el rango de valores del azul, sal del bucle
+    if ((PTH==0x08)&&(cuenta>90)&&(frec>53) && (frec<57)) break;//Si es el blanco y se encuentra entre el rango de valores del blanco y                                                            //se cumple el número de pasos, sal del bucle
+    if ((PTH==0x10)&&(frec>5) && (frec<8)) break; //Si es el negro y se encuentra entre el rango de valores del negro, sal del bucle
+                     
+                    calcperiodo();   //Calcula periodo
+                
+                     
+                      
+                      }   //FIN WHILE(cuenta!=140)
+                      
+   
+           
+        
+        
+} //FIN COMPARAPERIODO
+/////////////////////////////////////////////Repite el programa si el usuario lo desea////////////////////////////////////////////////////
+
+void repite (void){
+  
+  while(1){
+    
+    if(PTH==0x00){
+     
+      configORIG();
+      cuenta = 0;
+      inidisplay();   
+      mandatexto();
+      RGBotro();
+
+    } //FIN DEL IF
+  }   //FIN DEL WHILE
+}     //FIN DE REPITE
+
+/////////////////////////////////////////////////////Comienza a leer el PTH y realiza otra vez el proceso/////////////////////////////////////
+
+void RGBotro (void){
+
+ 
+      RGB();
+      calcperiodo();
+      comparaperiodo();
+      repite();
+      
+} //FIN RGB2
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  
